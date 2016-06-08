@@ -31,11 +31,7 @@ class SQLObject
   end
 
   def self.table_name
-    if @table_name.nil?
-      @table_name = "#{self}".tableize
-    else
-      @table_name
-    end    # ...
+    @table_name ||= "#{self}".tableize
   end
 
   def self.all
@@ -60,8 +56,8 @@ class SQLObject
 
 
   def initialize(params = {})
-    difference = (params.keys.map(&:to_sym) - self.class.columns) #attributes names are symbols.
-    raise "unknown attribute '#{difference.first}'" unless difference.empty?
+    differences = (params.keys.map(&:to_sym) - self.class.columns) #attributes names are symbols.
+    raise "unknown attribute '#{differences.first}'" unless differences.empty?
 
     params.each do |key, val|
       self.send("#{key}=", val)
@@ -74,15 +70,16 @@ class SQLObject
   end
 
   def attribute_values
-    # self.class.columns.map do |col|
-    #   self.send(col)
-    # end
-    attributes.values
+    self.class.columns.map do |col|
+      self.send(col)
+    end
+    # The below code will fetch attributes that are not included in the columns
+    # attributes.values
   end
 
   def insert
-    col_names = self.class.columns.drop(1).map(&:to_s).join(', ')
-    question_marks = (["?"] * (attributes.values.length)).join(', ')
+    col_names = self.class.columns.drop(1).map(&:to_s).join(', ') # drop ':id' columns
+    question_marks = (["?"] * (self.class.columns.drop(1).length - 1)).join(', ')
 
     DBConnection.execute(<<-SQL, *attribute_values)
       INSERT INTO
